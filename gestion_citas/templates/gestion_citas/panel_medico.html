@@ -1,0 +1,333 @@
+{% extends "gestion_citas/base.html" %}
+
+{% block title %}Expediente clínico | Centro Médico{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+    .ehr-shell {
+        min-height: calc(100vh - 11rem);
+    }
+
+    .ehr-sidebar {
+        background: #fff;
+        border-radius: 1rem;
+    }
+
+    .ehr-main {
+        min-width: 0;
+    }
+
+    .consultation-field textarea {
+        min-height: 7rem;
+        resize: vertical;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4 ehr-shell">
+    <aside class="col-md-4 col-xl-3" aria-labelledby="agenda-heading">
+        <div class="ehr-sidebar card border-0 shadow-sm h-100">
+            <div class="card-header bg-primary text-white border-0 rounded-top-4 p-4">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="rounded-circle bg-white bg-opacity-25 d-inline-flex align-items-center justify-content-center" style="width: 2.75rem; height: 2.75rem;">
+                        <i class="fa-solid fa-calendar-day" aria-hidden="true"></i>
+                    </span>
+                    <div>
+                        <h1 class="h5 mb-0" id="agenda-heading">Mi Agenda de Hoy</h1>
+                        <small>{{ citas|length }} citas programadas</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="list-group list-group-flush">
+                {% for cita in citas %}
+                    <div class="list-group-item px-3 py-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <span class="badge text-bg-light border">
+                                <i class="fa-regular fa-clock me-1 text-primary" aria-hidden="true"></i>
+                                {{ cita.hora|time:"H:i" }}
+                            </span>
+                            {% if cita.estado == "Atendida" %}
+                                <span class="badge text-bg-success">Atendida</span>
+                            {% else %}
+                                <span class="badge text-bg-primary">Pendiente</span>
+                            {% endif %}
+                        </div>
+                        <div class="fw-semibold mt-2">
+                            {{ cita.id_paciente.user.get_full_name|default:cita.id_paciente.user.username }}
+                        </div>
+                        <small class="text-body-secondary d-block mb-3">Expediente #{{ cita.id_paciente_id }}</small>
+                        {% if cita.estado == "Confirmada" %}
+                            <a
+                                class="btn btn-sm btn-outline-primary w-100"
+                                href="?paciente_id={{ cita.id_paciente_id }}&cita_id={{ cita.pk }}"
+                            >
+                                <i class="fa-solid fa-stethoscope me-1" aria-hidden="true"></i>
+                                Atender
+                            </a>
+                        {% else %}
+                            <a
+                                class="btn btn-sm btn-outline-secondary w-100"
+                                href="?paciente_id={{ cita.id_paciente_id }}"
+                            >
+                                Ver historial
+                            </a>
+                        {% endif %}
+                    </div>
+                {% empty %}
+                    <div class="list-group-item text-center text-body-secondary py-5">
+                        <i class="fa-regular fa-calendar-xmark fa-2x mb-2" aria-hidden="true"></i>
+                        <p class="mb-0">No hay pacientes citados para hoy.</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="card-body mt-auto">
+                <button
+                    type="button"
+                    class="btn btn-outline-success w-100"
+                    data-bs-toggle="modal"
+                    data-bs-target="#nuevoPacienteModal"
+                >
+                    <i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>
+                    Registrar Nuevo Paciente Urgente
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="col-md-8 col-xl-9 ehr-main">
+        {% if not paciente_historia %}
+            <section class="card border-0 shadow-sm h-100">
+                <div class="card-body p-4 p-lg-5">
+                    <div class="mb-4">
+                        <span class="badge rounded-pill text-bg-primary-subtle text-primary mb-3">
+                            <i class="fa-solid fa-user-doctor me-1" aria-hidden="true"></i>
+                            {{ medico.especialidad }}
+                        </span>
+                        <h2 class="display-6 fw-semibold">Bienvenido, Dr. {{ medico.user.get_full_name|default:medico.user.username }}</h2>
+                        <p class="lead text-body-secondary">
+                            Seleccione un paciente de su agenda para consultar su expediente y registrar la atención.
+                        </p>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="card border-0 bg-primary-subtle h-100">
+                                <div class="card-body d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-primary-emphasis">Citas pendientes</div>
+                                        <div class="display-6 fw-semibold text-primary">{{ citas_pendientes }}</div>
+                                    </div>
+                                    <i class="fa-solid fa-hourglass-half fa-2x text-primary opacity-75" aria-hidden="true"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="card border-0 bg-success-subtle h-100">
+                                <div class="card-body d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="text-success-emphasis">Citas atendidas</div>
+                                        <div class="display-6 fw-semibold text-success">{{ citas_atendidas }}</div>
+                                    </div>
+                                    <i class="fa-solid fa-circle-check fa-2x text-success opacity-75" aria-hidden="true"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border mt-4 mb-0" role="status">
+                        <i class="fa-solid fa-shield-heart text-primary me-2" aria-hidden="true"></i>
+                        La información clínica se muestra únicamente para pacientes vinculados a su agenda.
+                    </div>
+                </div>
+            </section>
+        {% else %}
+            <section class="card border-0 shadow-sm mb-4" aria-labelledby="patient-profile-heading">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center" style="width: 3.5rem; height: 3.5rem;">
+                            <i class="fa-solid fa-user fa-lg" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <h2 class="h4 mb-1" id="patient-profile-heading">
+                                {{ paciente_historia.user.get_full_name|default:paciente_historia.user.username }}
+                            </h2>
+                            <span class="text-body-secondary">Perfil del paciente</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <div class="row g-3">
+                        <div class="col-sm-4">
+                            <div class="small text-body-secondary">Nombre</div>
+                            <div class="fw-semibold">{{ paciente_historia.user.get_full_name|default:paciente_historia.user.username }}</div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="small text-body-secondary">Edad</div>
+                            <div class="fw-semibold">
+                                Edad: {{ paciente_historia.edad }}{% if paciente_historia.fecha_nacimiento %} años{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="small text-body-secondary">Cédula</div>
+                            <div class="fw-semibold">{{ paciente_historia.cedula }}</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="accordion shadow-sm mb-4" id="medicalHistoryAccordion">
+                <div class="accordion-item border-0 rounded-3 overflow-hidden">
+                    <h2 class="accordion-header" id="medicalHistoryHeading">
+                        <button
+                            class="accordion-button collapsed fw-semibold"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#medicalHistoryContent"
+                            aria-expanded="false"
+                            aria-controls="medicalHistoryContent"
+                        >
+                            <i class="fa-solid fa-clock-rotate-left text-primary me-2" aria-hidden="true"></i>
+                            Historial Médico Anterior
+                            <span class="badge rounded-pill text-bg-secondary ms-2">{{ historial_medico|length }}</span>
+                        </button>
+                    </h2>
+                    <div
+                        id="medicalHistoryContent"
+                        class="accordion-collapse collapse"
+                        aria-labelledby="medicalHistoryHeading"
+                        data-bs-parent="#medicalHistoryAccordion"
+                    >
+                        <div class="accordion-body bg-white">
+                            {% for atencion in historial_medico %}
+                                <article class="border-start border-3 border-primary ps-3 mb-4">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                                        <strong>{{ atencion.fecha_registro|date:"d/m/Y H:i" }}</strong>
+                                        <span class="small text-body-secondary">
+                                            Dr. {{ atencion.id_cita.id_medico.user.get_full_name|default:atencion.id_cita.id_medico.user.username }}
+                                        </span>
+                                    </div>
+                                    <p class="mb-1"><strong>Motivo:</strong> {{ atencion.motivo_consulta|linebreaksbr }}</p>
+                                    <p class="mb-1"><strong>Diagnóstico:</strong> {{ atencion.diagnostico_clinico|linebreaksbr }}</p>
+                                    <p class="mb-1"><strong>Tratamiento:</strong> {{ atencion.tratamiento|linebreaksbr }}</p>
+                                    {% if atencion.observaciones %}
+                                        <p class="mb-0"><strong>Observaciones:</strong> {{ atencion.observaciones|linebreaksbr }}</p>
+                                    {% endif %}
+                                </article>
+                            {% empty %}
+                                <p class="text-body-secondary mb-0">No hay atenciones anteriores registradas.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {% if cita_seleccionada and cita_seleccionada.estado == "Confirmada" %}
+                <section class="card border-0 shadow-sm" aria-labelledby="current-consultation-heading">
+                    <div class="card-header bg-white border-0 pt-4 px-4">
+                        <span class="badge text-bg-success mb-2">
+                            <i class="fa-solid fa-circle-dot me-1" aria-hidden="true"></i>
+                            Consulta actual · {{ cita_seleccionada.hora|time:"H:i" }}
+                        </span>
+                        <h2 class="h4 mb-0" id="current-consultation-heading">Registro de atención</h2>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="registrar_atencion">
+                            <input type="hidden" name="cita_id" value="{{ cita_seleccionada.pk }}">
+                            <input type="hidden" name="paciente_id" value="{{ paciente_historia.pk }}">
+
+                            {% if atencion_form.non_field_errors %}
+                                <div class="alert alert-danger" role="alert">{{ atencion_form.non_field_errors }}</div>
+                            {% endif %}
+                            {% for field in atencion_form %}
+                                <div class="mb-3 consultation-field">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% for error in field.errors %}
+                                        <div class="invalid-feedback d-block">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            <div class="d-grid d-sm-flex justify-content-sm-end mt-4">
+                                <button type="submit" class="btn btn-success btn-lg px-4">
+                                    <i class="fa-solid fa-floppy-disk me-2" aria-hidden="true"></i>
+                                    Finalizar Consulta y Guardar Historial
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            {% elif cita_seleccionada %}
+                <div class="alert alert-success shadow-sm" role="status">
+                    <i class="fa-solid fa-circle-check me-2" aria-hidden="true"></i>
+                    Esta cita ya fue atendida.
+                </div>
+            {% else %}
+                <div class="alert alert-info shadow-sm" role="status">
+                    <i class="fa-solid fa-circle-info me-2" aria-hidden="true"></i>
+                    El paciente no tiene una cita pendiente seleccionada para hoy.
+                    Seleccione «Atender» desde la agenda para iniciar una consulta.
+                </div>
+            {% endif %}
+        {% endif %}
+    </main>
+</div>
+
+<div class="modal fade" id="nuevoPacienteModal" tabindex="-1" aria-labelledby="nuevoPacienteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h2 class="modal-title fs-5" id="nuevoPacienteModalLabel">
+                    <i class="fa-solid fa-user-plus me-2" aria-hidden="true"></i>
+                    Registrar Nuevo Paciente Urgente
+                </h2>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="registrar_paciente">
+                    {% if paciente_form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">{{ paciente_form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="row">
+                        {% for field in paciente_form %}
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% for error in field.errors %}
+                                    <div class="invalid-feedback d-block">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>
+                        Registrar paciente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if paciente_form.errors %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        bootstrap.Modal.getOrCreateInstance(
+            document.getElementById("nuevoPacienteModal")
+        ).show();
+    });
+</script>
+{% endif %}
+{% endblock %}
