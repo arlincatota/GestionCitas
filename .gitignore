@@ -2,9 +2,6 @@
 venv/
 env/
 
-# Base de datos local
-db.sqlite3
-
 # Archivos compilados de Python
 __pycache__/
 *.pyc
